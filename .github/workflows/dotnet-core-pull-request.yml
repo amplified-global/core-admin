@@ -18,6 +18,14 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --configuration Release --no-restore
+    - name: Generate NuGet package
+      run: |
+         cd src\DotNetEd.CoreAdmin
+         dotnet pack -c Release -o out
+    - name: Push generated package to Github
+      run: |
+         dotnet nuget add source "https://nuget.pkg.github.com/amplified-global/index.json" --name "AmpPackages" --username "amplified-global" --password "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" --store-password-in-clear-text
+         nuget push src\DotNetEd.CoreAdmin\out\*.nupkg -SkipDuplicate -NoSymbols -Source "AmpPackages"
     # - name: Test
     #   run: dotnet test --no-restore --verbosity normal
 
