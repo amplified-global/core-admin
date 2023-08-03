@@ -18,18 +18,16 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --configuration Release --no-restore
-    # - name: Test
-    #   run: dotnet test --no-restore --verbosity normal
-    # - name: Generate NuGet package
-    #   run: |
-    #      cd src\DotNetEd.CoreAdmin
-    #      dotnet pack -c Release -o out
-    # - name: Setup nuget
-    #   uses: nuget/setup-nuget@v1
-    #   with:
-    #     nuget-api-key: ${{ secrets.NUGET_API_KEY }}
-    # - name: Push generated package to Github
-    #   run: |
-    #      dotnet nuget add source "https://nuget.pkg.github.com/amplified-global/index.json" --name "AmpPackages" --username "amplified-global" --password "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" --store-password-in-clear-text
-    #      nuget push src\DotNetEd.CoreAdmin\out\*.nupkg -SkipDuplicate -NoSymbols -Source "AmpPackages"
+    - name: Generate NuGet package
+      run: |
+         cd src\DotNetEd.CoreAdmin
+         dotnet pack -c Release -o out
+    - name: Setup nuget
+      uses: nuget/setup-nuget@v1
+      with:
+        nuget-api-key: ${{ secrets.PACKAGE_PAT }}
+    - name: Push generated package to Github
+      run: |
+         dotnet nuget add source "https://nuget.pkg.github.com/amplified-global/index.json" --name "AmpPackages" --username "amplified-global" --password ${{ secrets.PACKAGE_PAT }} --store-password-in-clear-text
+         nuget push src\DotNetEd.CoreAdmin\out\*.nupkg -SkipDuplicate -NoSymbols -Source "AmpPackages"
 

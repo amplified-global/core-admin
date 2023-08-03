@@ -6,7 +6,7 @@
 		<PreserveCompilationContext>false</PreserveCompilationContext>
 		<SuppressDependenciesWhenPacking>false</SuppressDependenciesWhenPacking>
 		<PackageId>AmplifiAdminPortal</PackageId>
-		<PackageVersion>1.0.16</PackageVersion>
+		<PackageVersion>1.0.17</PackageVersion>
 		<Description>Automagically add an Admin Panel to your .NET 6 web app.</Description>
 		<Title>Core Admin Panel for ASP.NET Core</Title>
 		<Authors>amplifi</Authors>
