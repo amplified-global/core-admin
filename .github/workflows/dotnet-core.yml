@@ -20,14 +20,16 @@ jobs:
       run: dotnet build --configuration Release --no-restore
     # - name: Test
     #   run: dotnet test --no-restore --verbosity normal
-    # - name: Build solution and generate NuGet package
+    # - name: Generate NuGet package
     #   run: |
-    #     cd src\DotNetEd.CoreAdmin
-    #     dotnet pack -c Release -o out  
+    #      cd src\DotNetEd.CoreAdmin
+    #      dotnet pack -c Release -o out
     # - name: Setup nuget
     #   uses: nuget/setup-nuget@v1
     #   with:
     #     nuget-api-key: ${{ secrets.NUGET_API_KEY }}
-    # - name: Push generated package to Nuget
-    #   run: nuget push src\DotNetEd.CoreAdmin\out\*.nupkg -SkipDuplicate -NoSymbols -Source https://api.nuget.org/v3/index.json
+    # - name: Push generated package to Github
+    #   run: |
+    #      dotnet nuget add source "https://nuget.pkg.github.com/amplified-global/index.json" --name "AmpPackages" --username "amplified-global" --password "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" --store-password-in-clear-text
+    #      nuget push src\DotNetEd.CoreAdmin\out\*.nupkg -SkipDuplicate -NoSymbols -Source "AmpPackages"
 
