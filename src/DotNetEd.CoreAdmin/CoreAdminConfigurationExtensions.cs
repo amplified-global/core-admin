@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
+using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
@@ -137,8 +138,8 @@ namespace Microsoft.Extensions.DependencyInjection
 					{
 						foreach (var connectionString in connectionStrings)
 						{
-							SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(connectionString);
-							databaseName2ConnectionStrings.Add(builder.InitialCatalog, connectionString);
+							NpgsqlConnectionStringBuilder builder = new NpgsqlConnectionStringBuilder(connectionString);
+							databaseName2ConnectionStrings.Add(builder.Database, connectionString);
 						}
 					}
 
