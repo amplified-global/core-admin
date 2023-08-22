@@ -150,10 +150,10 @@ namespace DotNetEd.CoreAdmin.Controllers
 		public IActionResult EditEntity(string dbSetName, string id, string secondId)
 		{
 			var entityToEdit = GetEntityFromDbSet(dbSetName, id, secondId, out var dbContextObject, out var entityType, out var relationships);
+			var keys = dbContextObject.Model.FindEntityTypes(entityType).First().FindPrimaryKey().Properties.Select(k => k.Name);
 
-			var databaseGeneratedProperties =
-			entityToEdit.GetType().GetProperties()
-			.Where(p => p.GetCustomAttributes().Any(a => a.GetType().Name.Contains("DatabaseGenerated"))).Select(p => p.Name);
+			var databaseGeneratedProperties = entityToEdit.GetType().GetProperties()
+				.Where(p => p.GetCustomAttributes().Any(a => a.GetType().Name.Contains("DatabaseGenerated"))).Select(p => p.Name).Concat(keys);
 
 			ViewBag.DbSetName = dbSetName;
 			ViewBag.Id = id;
@@ -348,7 +348,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 								foreach (var childValue in allChildren2)
 								{
 									var childPkValue = childValue.GetType().GetProperty(primaryKey2.Properties.First().Name).GetValue(childValue);
-									childValues.TryAdd(childPkValue, childValue.ToString());
+									childValues.TryAdd(childPkValue, $"[{childPkValue}] {childValue}");
 								}
 							}
 
