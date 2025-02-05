@@ -2,7 +2,7 @@
 @using Microsoft.Extensions.Localization
 @using NonFactors.Mvc.Grid
 @using System.Linq.Expressions
-@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore;
 @using System.ComponentModel.DataAnnotations;
 @using System.Reflection
 @using System.Collections;
@@ -18,16 +18,15 @@
     var options = CoreAdminOptions.FirstOrDefault();
 }
 
-<h1 class="display-4">@Model.TableName</h1>
+<h1 class="mt-3">@Model.TableName</h1>
 
 <div class="row">
-    <div class="col-lg-12 my-3">
-        @Html.ActionLink(_localizer["CreateNew"], "Create", new { id = Model.TableName }, new { @class = "btn btn-primary"})
+    <div class="col-lg-12 my-3 text-end">
+        @Html.ActionLink(_localizer["CreateNew"], "Create", new { id = Model.TableName }, new { @class = "btn btn-primary" })
     </div>
 </div>
 
-@(
-Html
+@(Html
     .Grid(Model.Data)
     .Build((columns) => {
 
@@ -40,7 +39,6 @@ Html
             var changedType = Expression.Convert(entity, Model.EntityType);
             var property = Expression.Property(changedType, entityProperty.Name);
             var propertyDisplayName = entityProperty.Name;
-
             if(Attribute.IsDefined(entityProperty, typeof(DisplayAttribute)))
             {
                 var displayAttribute = entityProperty.GetCustomAttributes(typeof(DisplayAttribute),true).FirstOrDefault() as DisplayAttribute;

@@ -77,6 +77,113 @@ namespace DotNetEd.CoreAdmin.Controllers
 			return View(viewModel);
 		}
 
+		[System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "<Pending>")]
+		private object GetDbSetValueOrNull(string dbSetName, out DbContext dbContextObject,
+			out Type typeOfEntity,
+			out Dictionary<string, Dictionary<object, string>> relationships)
+		{
+			string dbSetPropertyName = dbSetName;
+			var stringParts = dbSetName.Split(" - ");
+			if (stringParts.Length > 0)
+			{
+				dbSetPropertyName = stringParts[stringParts.Length - 1];
+			}
+
+			foreach (var dbSetEntity in dbSetEntities.Where(db => db.Name.ToLowerInvariant() == dbSetName.ToLowerInvariant()))
+			{
+				foreach (var dbSetProperty in dbSetEntity.DbContextType.GetProperties())
+				{
+					if (dbSetProperty.PropertyType.IsGenericType && dbSetProperty.PropertyType.Name.StartsWith("DbSet") && dbSetProperty.Name.ToLowerInvariant() == dbSetPropertyName.ToLowerInvariant())
+					{
+						dbContextObject = (DbContext)this.HttpContext.RequestServices.GetRequiredService(dbSetEntity.DbContextType);
+						if (dbSetEntity.ConnectionString != null)
+						{
+							dbContextObject.Database.GetDbConnection().ConnectionString = dbSetEntity.ConnectionString;
+						}
+
+						typeOfEntity = dbSetProperty.PropertyType.GetGenericArguments()[0];
+
+
+						var fks = dbContextObject.Model.FindEntityType(typeOfEntity)
+							.GetForeignKeyProperties().Cast<Microsoft.EntityFrameworkCore.Metadata.RuntimeProperty>();
+
+						var relationshipDictionary = new Dictionary<string, Dictionary<object, string>>();
+						foreach (var f in fks)
+						{
+							var childValues = new Dictionary<object, string>();
+
+							if (f.ForeignKeys.Count == 1)
+							{
+								var typeOfChild = f.ForeignKeys.First();
+
+								var targetChildListOnDbContext = dbContextObject.GetType().GetProperties()
+									.FirstOrDefault(p => p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>)
+									&& p.PropertyType.GetGenericArguments().First().FullName == typeOfChild.PrincipalEntityType.Name);
+
+								var primaryKey2 = dbContextObject.Model.FindEntityType(typeOfChild.PrincipalEntityType.Name).FindPrimaryKey();
+
+								if (primaryKey2.Properties.Count > 1)
+								{
+									continue;
+								}
+
+								var allChildren2 = (IEnumerable<object>)dbContextObject.GetType().GetProperty(targetChildListOnDbContext.Name).GetValue(dbContextObject);
+
+								NullabilityInfoContext _nullabilityContext = new NullabilityInfoContext();
+								var nullabilityInfo = _nullabilityContext.Create(typeOfEntity.GetProperty(f.Name));
+								if (nullabilityInfo.WriteState == NullabilityState.Nullable)
+								{
+									childValues.Add(string.Empty, String.Empty);
+								}
+
+								foreach (var childValue in allChildren2)
+								{
+									var childPkValue = childValue.GetType().GetProperty(primaryKey2.Properties.First().Name).GetValue(childValue);
+									childValues.TryAdd(childPkValue, $"[{childPkValue}] {childValue}");
+								}
+							}
+
+
+							relationshipDictionary.Add(f.Name, childValues);
+						}
+
+						relationships = relationshipDictionary;
+
+						return dbSetProperty.GetValue(dbContextObject);
+					}
+				}
+			}
+
+			dbContextObject = null;
+			typeOfEntity = null;
+			relationships = null;
+			return null;
+		}
+
+		private object GetEntityFromDbSet(string dbSetName, string id, string secondId,
+			out DbContext dbContextObject, out Type typeOfEntity,
+			out Dictionary<string, Dictionary<object, string>> relationships)
+		{
+			var dbSetValue = GetDbSetValueOrNull(dbSetName, out dbContextObject, out typeOfEntity, out relationships);
+
+			var primaryKeyList = new List<object>();
+
+			var primaryKey = dbContextObject.Model.FindEntityType(typeOfEntity).FindPrimaryKey();
+			var clrType = primaryKey.Properties[0].ClrType;
+			object convertedPrimaryKey = GetConvertedPrimaryKey(clrType, id);
+
+			primaryKeyList.Add(convertedPrimaryKey);
+
+			if (secondId != null)
+			{
+				clrType = primaryKey.Properties[1].ClrType;
+				object convertedSecondPrimaryKey = GetConvertedPrimaryKey(clrType, secondId);
+				primaryKeyList.Add(convertedSecondPrimaryKey);
+			}
+
+			return dbSetValue.GetType().InvokeMember("Find", BindingFlags.InvokeMethod, null, dbSetValue, args: primaryKeyList.ToArray());
+		}
+
 		[HttpPost]
 		[IgnoreAntiforgeryToken]
 		public async Task<IActionResult> CreateEntityPost(string dbSetName, string id, [FromForm] object formData)
@@ -94,6 +201,9 @@ namespace DotNetEd.CoreAdmin.Controllers
 			await TryUpdateModelAsync(newEntity, entityType, string.Empty,
 				await CompositeValueProvider.CreateAsync(this.ControllerContext, this.ControllerContext.ValueProviderFactories),
 				(ModelMetadata meta) => !databaseGeneratedProperties.Contains(meta.PropertyName));
+
+			newEntity.GetType().GetProperties().Where(p => p.PropertyType == typeof(DateTimeOffset)).ToList().ForEach(p =>
+				p.SetValue(newEntity, ((DateTimeOffset)p.GetValue(newEntity)).ToUniversalTime()));
 
 			newEntity.GetType().GetProperties()
 			.Where(p => p.GetCustomAttributes().Any(a => a.GetType().Name.Contains("ForeignKey"))).Select(p => p.Name).ToList().ForEach(fkProperty =>
@@ -179,6 +289,9 @@ namespace DotNetEd.CoreAdmin.Controllers
 			await TryUpdateModelAsync(entityToEdit, entityType, string.Empty, await CompositeValueProvider.CreateAsync(this.ControllerContext, this.ControllerContext.ValueProviderFactories),
 				(ModelMetadata meta) => !databaseGeneratedProperties.Contains(meta.PropertyName));
 
+			entityToEdit.GetType().GetProperties().Where(p => p.PropertyType == typeof(DateTimeOffset)).ToList().ForEach(p =>
+				p.SetValue(entityToEdit, ((DateTimeOffset)p.GetValue(entityToEdit)).ToUniversalTime()));
+
 			entityToEdit.GetType().GetProperties()
 			.Where(p => p.GetCustomAttributes().Any(a => a.GetType().Name.Contains("ForeignKey"))).Select(p => p.Name).ToList().ForEach(fkProperty =>
 			{
@@ -201,6 +314,21 @@ namespace DotNetEd.CoreAdmin.Controllers
 			ViewBag.IgnoreFromForm = databaseGeneratedProperties;
 
 			return View("Edit", entityToEdit);
+		}
+
+		private async Task AddByteArrayFiles(object entityToEdit)
+		{
+			foreach (var file in Request.Form.Files)
+			{
+				var matchingProperty = entityToEdit.GetType().GetProperties()
+					.FirstOrDefault(prop => prop.Name == file.Name && prop.PropertyType == typeof(byte[]));
+				if (matchingProperty != null)
+				{
+					var memoryStream = new MemoryStream();
+					await file.CopyToAsync(memoryStream);
+					matchingProperty.SetValue(entityToEdit, memoryStream.ToArray());
+				}
+			}
 		}
 
 		[HttpGet]
@@ -284,128 +412,6 @@ namespace DotNetEd.CoreAdmin.Controllers
 			}
 
 			return convertedPrimaryKey;
-		}
-
-		[System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "<Pending>")]
-		private object GetDbSetValueOrNull(string dbSetName, out DbContext dbContextObject,
-			out Type typeOfEntity,
-			out Dictionary<string, Dictionary<object, string>> relationships)
-		{
-			string dbSetPropertyName = dbSetName;
-			var stringParts = dbSetName.Split(" - ");
-			if (stringParts.Length > 0)
-			{
-				dbSetPropertyName = stringParts[stringParts.Length - 1];
-			}
-
-			foreach (var dbSetEntity in dbSetEntities.Where(db => db.Name.ToLowerInvariant() == dbSetName.ToLowerInvariant()))
-			{
-				foreach (var dbSetProperty in dbSetEntity.DbContextType.GetProperties())
-				{
-					if (dbSetProperty.PropertyType.IsGenericType && dbSetProperty.PropertyType.Name.StartsWith("DbSet") && dbSetProperty.Name.ToLowerInvariant() == dbSetPropertyName.ToLowerInvariant())
-					{
-						dbContextObject = (DbContext)this.HttpContext.RequestServices.GetRequiredService(dbSetEntity.DbContextType);
-						if (dbSetEntity.ConnectionString != null)
-						{
-							dbContextObject.Database.GetDbConnection().ConnectionString = dbSetEntity.ConnectionString;
-						}
-
-						typeOfEntity = dbSetProperty.PropertyType.GetGenericArguments()[0];
-
-
-						var fks = dbContextObject.Model.FindEntityType(typeOfEntity)
-							.GetForeignKeyProperties().Cast<Microsoft.EntityFrameworkCore.Metadata.RuntimeProperty>();
-
-						var relationshipDictionary = new Dictionary<string, Dictionary<object, string>>();
-						foreach (var f in fks)
-						{
-							var childValues = new Dictionary<object, string>();
-
-							if (f.ForeignKeys.Count == 1)
-							{
-								var typeOfChild = f.ForeignKeys[0];
-
-								var targetChildListOnDbContext = dbContextObject.GetType().GetProperties()
-									.FirstOrDefault(p => p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>)
-									&& p.PropertyType.GetGenericArguments().First().FullName == typeOfChild.PrincipalEntityType.Name);
-
-								var primaryKey2 = dbContextObject.Model.FindEntityType(typeOfChild.PrincipalEntityType.Name).FindPrimaryKey();
-
-								if (primaryKey2.Properties.Count > 1)
-								{
-									continue;
-								}
-
-								var allChildren2 = (IEnumerable<object>)dbContextObject.GetType().GetProperty(targetChildListOnDbContext.Name).GetValue(dbContextObject);
-
-								NullabilityInfoContext _nullabilityContext = new NullabilityInfoContext();
-								var nullabilityInfo = _nullabilityContext.Create(typeOfEntity.GetProperty(f.Name));
-								if (nullabilityInfo.WriteState == NullabilityState.Nullable)
-								{
-									childValues.Add(string.Empty, String.Empty);
-								}
-
-								foreach (var childValue in allChildren2)
-								{
-									var childPkValue = childValue.GetType().GetProperty(primaryKey2.Properties.First().Name).GetValue(childValue);
-									childValues.TryAdd(childPkValue, $"[{childPkValue}] {childValue}");
-								}
-							}
-
-
-							relationshipDictionary.Add(f.Name, childValues);
-						}
-
-						relationships = relationshipDictionary;
-
-						return dbSetProperty.GetValue(dbContextObject);
-					}
-				}
-			}
-
-			dbContextObject = null;
-			typeOfEntity = null;
-			relationships = null;
-			return null;
-		}
-
-		private object GetEntityFromDbSet(string dbSetName, string id, string secondId,
-			out DbContext dbContextObject, out Type typeOfEntity,
-			out Dictionary<string, Dictionary<object, string>> relationships)
-		{
-			var dbSetValue = GetDbSetValueOrNull(dbSetName, out dbContextObject, out typeOfEntity, out relationships);
-
-			var primaryKeyList = new List<object>();
-
-			var primaryKey = dbContextObject.Model.FindEntityType(typeOfEntity).FindPrimaryKey();
-			var clrType = primaryKey.Properties[0].ClrType;
-			object convertedPrimaryKey = GetConvertedPrimaryKey(clrType, id);
-
-			primaryKeyList.Add(convertedPrimaryKey);
-
-			if (secondId != null)
-			{
-				clrType = primaryKey.Properties[1].ClrType;
-				object convertedSecondPrimaryKey = GetConvertedPrimaryKey(clrType, secondId);
-				primaryKeyList.Add(convertedSecondPrimaryKey);
-			}
-
-			return dbSetValue.GetType().InvokeMember("Find", BindingFlags.InvokeMethod, null, dbSetValue, args: primaryKeyList.ToArray());
-		}
-
-		private async Task AddByteArrayFiles(object entityToEdit)
-		{
-			foreach (var file in Request.Form.Files)
-			{
-				var matchingProperty = entityToEdit.GetType().GetProperties()
-					.FirstOrDefault(prop => prop.Name == file.Name && prop.PropertyType == typeof(byte[]));
-				if (matchingProperty != null)
-				{
-					var memoryStream = new MemoryStream();
-					await file.CopyToAsync(memoryStream);
-					matchingProperty.SetValue(entityToEdit, memoryStream.ToArray());
-				}
-			}
 		}
 	}
 }
