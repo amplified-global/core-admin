@@ -17,7 +17,7 @@ namespace DotNetEd.CoreAdmin
 		public Dictionary<Int32, string> PageSizes { get; set; }
 		public bool ShowPageSizes { get; set; }
 		public GridFilterMode FilterMode { get; set; }
-		public string Title { get; set; } = "Core Admin";
+		public string Title { get; set; } = "Amplifi Admin Portal";
 		public string FirebaseApiKey { get; set; }
 		public Dictionary<string, List<string>> Context2ConnectionStrings { get; set; }
 		public string ApiUrl { get; set; }
