@@ -8,6 +8,6 @@ namespace DotNetEd.CoreAdmin
 		public string Name { get; internal set; }
 		public Type DbSetType { get; internal set; }
 		public Type UnderlyingType { get; internal set; }
-		public string ConnectionString { get; internal set; }
+		public Func<string> ConnectionString { get; internal set; }
 	}
 }
