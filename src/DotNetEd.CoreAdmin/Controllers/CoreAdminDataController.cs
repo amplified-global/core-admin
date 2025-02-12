@@ -49,7 +49,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 						var dbContextObject = (DbContext)this.HttpContext.RequestServices.GetRequiredService(dbSetEntity.DbContextType);
 						if (dbSetEntity.ConnectionString != null)
 						{
-							dbContextObject.Database.GetDbConnection().ConnectionString = dbSetEntity.ConnectionString;
+							dbContextObject.Database.GetDbConnection().ConnectionString = dbSetEntity.ConnectionString();
 						}
 
 						var query = dbContextObject.Set(viewModel.EntityType);
@@ -98,7 +98,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 						dbContextObject = (DbContext)this.HttpContext.RequestServices.GetRequiredService(dbSetEntity.DbContextType);
 						if (dbSetEntity.ConnectionString != null)
 						{
-							dbContextObject.Database.GetDbConnection().ConnectionString = dbSetEntity.ConnectionString;
+							dbContextObject.Database.GetDbConnection().ConnectionString = dbSetEntity.ConnectionString();
 						}
 
 						typeOfEntity = dbSetProperty.PropertyType.GetGenericArguments()[0];
@@ -364,7 +364,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 						var dbContextObject = (DbContext)this.HttpContext.RequestServices.GetRequiredService(dbSetEntity.DbContextType);
 						if (dbSetEntity.ConnectionString != null)
 						{
-							dbContextObject.Database.GetDbConnection().ConnectionString = dbSetEntity.ConnectionString;
+							dbContextObject.Database.GetDbConnection().ConnectionString = dbSetEntity.ConnectionString();
 						}
 						var dbSetValue = dbSetProperty.GetValue(dbContextObject);
 

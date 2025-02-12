@@ -19,7 +19,7 @@ namespace DotNetEd.CoreAdmin
 		public GridFilterMode FilterMode { get; set; }
 		public string Title { get; set; } = "Amplifi Admin Portal";
 		public string FirebaseApiKey { get; set; }
-		public Dictionary<string, List<string>> Context2ConnectionStrings { get; set; }
+		public Dictionary<string, List<Func<string>>> Context2ConnectionStrings { get; set; }
 		public string ApiUrl { get; set; }
 		public string AllowedRole { get; set; }
 		public long SuperAdminId { get; set; }

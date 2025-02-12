@@ -7,7 +7,6 @@ using Microsoft.Extensions.Localization;
 using Npgsql;
 using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -133,12 +132,12 @@ namespace Microsoft.Extensions.DependencyInjection
 				if (serviceType.IsSubclassOf(typeof(DbContext)) &&
 					!discoveredServices.Any(x => x.DbContextType == serviceType))
 				{
-					Dictionary<string, string> databaseName2ConnectionStrings = new Dictionary<string, string>();
-					if (options.Context2ConnectionStrings != null && options.Context2ConnectionStrings.TryGetValue(serviceType.Name, out List<string> connectionStrings))
+					Dictionary<string, Func<string>> databaseName2ConnectionStrings = new Dictionary<string, Func<string>>();
+					if (options.Context2ConnectionStrings != null && options.Context2ConnectionStrings.TryGetValue(serviceType.Name, out List<Func<string>> connectionStrings))
 					{
 						foreach (var connectionString in connectionStrings)
 						{
-							NpgsqlConnectionStringBuilder builder = new NpgsqlConnectionStringBuilder(connectionString);
+							NpgsqlConnectionStringBuilder builder = new NpgsqlConnectionStringBuilder(connectionString());
 							databaseName2ConnectionStrings.Add(builder.Database, connectionString);
 						}
 					}
