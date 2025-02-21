@@ -135,56 +135,15 @@ namespace DotNetEd.CoreAdmin.Controllers
 
 			var masterUserJson = await masterUserResponse.Content.ReadAsStringAsync();
 			var masterUser = JsonConvert.DeserializeObject<JObject>(masterUserJson);
-			string mfaCode = (string)masterUser["mfaCode"];
 
-			var masterUserId = (long)masterUser["id"];
-			if (masterUserId == options.SuperAdminId)
+			long seat = (long)masterUser["seat"];
+			long adminSeat = (long)masterUser["adminSeat"];
+			if (adminSeat == 1 && seat == 2) // Check if user is amplifi admin
 			{
-				return Tuple.Create(true, mfaCode);
+				return Tuple.Create(true, (string)masterUser["mfaCode"]);
 			}
 
-			var tenants = masterUser["tenants"];
-			string tenantId = "";
-			if (tenants.Any())
-			{
-				foreach (var tenant in tenants)
-				{
-					if ((bool)tenant["isDefault"])
-					{
-						tenantId = (string)tenant["id"];
-					}
-				}
-			}
-
-			if (tenantId == "")
-			{
-				logger.Log(LogLevel.Information, "User doesn't have default tenant.");
-				return Tuple.Create(false, "");
-			}
-
-			//Get user role
-			client.DefaultRequestHeaders.Add("TenantId", tenantId);
-			var permissionResponse = await client.GetAsync("/api/v1/login/permission_details");
-			if (!permissionResponse.IsSuccessStatusCode)
-			{
-				logger.Log(LogLevel.Warning, "/api/v1/login/permission_details hasn't returned successfull status code.");
-				return Tuple.Create(false, "");
-			}
-
-			var permissionResponseJson = await permissionResponse.Content.ReadAsStringAsync();
-			var permissionsAndRoles = JsonConvert.DeserializeObject<JObject>(permissionResponseJson);
-			var roles = permissionsAndRoles["roles"];
-			if (roles.Any())
-			{
-				var roleName = roles[0]["name"].ToString();
-				if (roleName.Equals(options.AllowedRole, StringComparison.InvariantCultureIgnoreCase))
-				{
-					return Tuple.Create(true, mfaCode);
-				}
-			}
-
-			logger.Log(LogLevel.Information, "User doesn't have products.allaccess permission to access admin panel.");
-
+			logger.Log(LogLevel.Information, "User must be amplifi admin to access admin panel.");
 			return Tuple.Create(false, "");
 		}
 	}

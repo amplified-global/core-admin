@@ -21,8 +21,6 @@ namespace DotNetEd.CoreAdmin
 		public string FirebaseApiKey { get; set; }
 		public Dictionary<string, List<Func<string>>> Context2ConnectionStrings { get; set; }
 		public string ApiUrl { get; set; }
-		public string AllowedRole { get; set; }
-		public long SuperAdminId { get; set; }
 
 		public CoreAdminOptions()
 		{
