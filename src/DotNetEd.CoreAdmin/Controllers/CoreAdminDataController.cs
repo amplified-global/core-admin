@@ -410,6 +410,10 @@ namespace DotNetEd.CoreAdmin.Controllers
 			{
 				convertedPrimaryKey = long.Parse(id);
 			}
+			else if (clrType.IsEnum)
+			{
+				convertedPrimaryKey = Enum.Parse(clrType, id);
+			}
 
 			return convertedPrimaryKey;
 		}
