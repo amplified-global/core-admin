@@ -21,6 +21,7 @@ namespace DotNetEd.CoreAdmin
 		public string FirebaseApiKey { get; set; }
 		public Dictionary<string, List<Func<string>>> Context2ConnectionStrings { get; set; }
 		public string ApiUrl { get; set; }
+		public Func<object, Task<(string dbContextTypeName, Func<string> connectionString)>> OnTenantCreated { get; set; }
 
 		public CoreAdminOptions()
 		{

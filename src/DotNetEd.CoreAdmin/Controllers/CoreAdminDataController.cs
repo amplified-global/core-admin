@@ -18,10 +18,68 @@ namespace DotNetEd.CoreAdmin.Controllers
 	public class CoreAdminDataController : Controller
 	{
 		private readonly IEnumerable<DiscoveredDbSetEntityType> dbSetEntities;
+		private readonly IServiceProvider serviceProvider;
 
-		public CoreAdminDataController(IEnumerable<DiscoveredDbSetEntityType> dbSetEntities)
+		public CoreAdminDataController(IEnumerable<DiscoveredDbSetEntityType> dbSetEntities, IServiceProvider serviceProvider)
 		{
 			this.dbSetEntities = dbSetEntities;
+			this.serviceProvider = serviceProvider;
+		}
+
+		/// <summary>
+		/// Gets all discovered DbSets, including dynamically added tenant databases from Context2ConnectionStrings
+		/// </summary>
+		private IEnumerable<DiscoveredDbSetEntityType> GetAllDiscoveredDbSets()
+		{
+			var allDbSets = dbSetEntities.ToList();
+			var options = serviceProvider.GetServices<CoreAdminOptions>().FirstOrDefault();
+
+			if (options?.Context2ConnectionStrings != null)
+			{
+				var knownDbContextTypes = dbSetEntities.Select(d => d.DbContextType).Distinct().ToList();
+
+				foreach (var dbContextType in knownDbContextTypes)
+				{
+					if (options.Context2ConnectionStrings.TryGetValue(dbContextType.Name, out List<Func<string>> connectionStrings))
+					{
+						foreach (var connectionStringFunc in connectionStrings)
+						{
+							try
+							{
+								var connectionString = connectionStringFunc();
+								var dbName = new Npgsql.NpgsqlConnectionStringBuilder(connectionString).Database;
+
+								var dbSetProperties = dbContextType.GetProperties()
+									.Where(p => p.PropertyType.IsGenericType && p.PropertyType.Name.StartsWith("DbSet") && !options.IgnoreEntityTypes.Contains(p.PropertyType.GenericTypeArguments.First()))
+									.ToList();
+
+								foreach (var dbSetProperty in dbSetProperties)
+								{
+									var name = dbName + " - " + dbSetProperty.Name;
+
+									if (!allDbSets.Any(d => d.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+									{
+										allDbSets.Add(new DiscoveredDbSetEntityType()
+										{
+											DbContextType = dbContextType,
+											DbSetType = dbSetProperty.PropertyType,
+											UnderlyingType = dbSetProperty.PropertyType.GenericTypeArguments.First(),
+											Name = name,
+											ConnectionString = connectionStringFunc
+										});
+									}
+								}
+							}
+							catch (Exception ex)
+							{
+								System.Diagnostics.Debug.WriteLine($"Skipping invalid connection string for DbContext '{dbContextType.Name}': {ex.Message}");
+							}
+						}
+					}
+				}
+			}
+
+			return allDbSets;
 		}
 
 
@@ -37,7 +95,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 				dbSetPropertyName = stringParts[stringParts.Length - 1];
 			}
 
-			foreach (var dbSetEntity in dbSetEntities.Where(db => db.Name.ToLowerInvariant() == id.ToLowerInvariant()))
+			foreach (var dbSetEntity in GetAllDiscoveredDbSets().Where(db => db.Name.ToLowerInvariant() == id.ToLowerInvariant()))
 			{
 				foreach (var dbSetProperty in dbSetEntity.DbContextType.GetProperties())
 				{
@@ -89,7 +147,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 				dbSetPropertyName = stringParts[stringParts.Length - 1];
 			}
 
-			foreach (var dbSetEntity in dbSetEntities.Where(db => db.Name.ToLowerInvariant() == dbSetName.ToLowerInvariant()))
+			foreach (var dbSetEntity in GetAllDiscoveredDbSets().Where(db => db.Name.ToLowerInvariant() == dbSetName.ToLowerInvariant()))
 			{
 				foreach (var dbSetProperty in dbSetEntity.DbContextType.GetProperties())
 				{
@@ -226,6 +284,39 @@ namespace DotNetEd.CoreAdmin.Controllers
 				// updated model with new values
 				dbContextObject.Add(newEntity);
 				await dbContextObject.SaveChangesAsync();
+
+				// If a Tenant entity was created, trigger the database creation callback
+				if (dbSetName.Contains("Tenants", StringComparison.OrdinalIgnoreCase) || entityType.Name.Contains("Tenant", StringComparison.OrdinalIgnoreCase))
+				{
+					var options = serviceProvider.GetServices<CoreAdminOptions>().FirstOrDefault();
+					if (options?.OnTenantCreated != null)
+					{
+						try
+						{
+							var result = await options.OnTenantCreated(newEntity);
+
+							if (result.connectionString != null && result.dbContextTypeName != null)
+							{
+								if (options.Context2ConnectionStrings == null)
+								{
+									options.Context2ConnectionStrings = new Dictionary<string, List<Func<string>>>();
+								}
+
+								if (!options.Context2ConnectionStrings.ContainsKey(result.dbContextTypeName))
+								{
+									options.Context2ConnectionStrings[result.dbContextTypeName] = new List<Func<string>>();
+								}
+
+								options.Context2ConnectionStrings[result.dbContextTypeName].Add(result.connectionString);
+							}
+						}
+						catch (Exception ex)
+						{
+							System.Diagnostics.Debug.WriteLine($"Error creating tenant database: {ex.Message}");
+						}
+					}
+				}
+
 				return RedirectToAction("Index", new { id = dbSetName });
 			}
 
@@ -355,7 +446,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 				dbSetPropertyName = stringParts[stringParts.Length - 1];
 			}
 
-			foreach (var dbSetEntity in dbSetEntities.Where(db => db.Name.ToLowerInvariant() == viewModel.DbSetName.ToLowerInvariant()))
+			foreach (var dbSetEntity in GetAllDiscoveredDbSets().Where(db => db.Name.ToLowerInvariant() == viewModel.DbSetName.ToLowerInvariant()))
 			{
 				foreach (var dbSetProperty in dbSetEntity.DbContextType.GetProperties())
 				{
