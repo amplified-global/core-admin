@@ -44,28 +44,35 @@ namespace DotNetEd.CoreAdmin.Controllers
 					{
 						foreach (var connectionStringFunc in connectionStrings)
 						{
-							var connectionString = connectionStringFunc();
-							var dbName = new Npgsql.NpgsqlConnectionStringBuilder(connectionString).Database;
-
-							var dbSetProperties = dbContextType.GetProperties()
-								.Where(p => p.PropertyType.IsGenericType && p.PropertyType.Name.StartsWith("DbSet") && !options.IgnoreEntityTypes.Contains(p.PropertyType.GenericTypeArguments.First()))
-								.ToList();
-
-							foreach (var dbSetProperty in dbSetProperties)
+							try
 							{
-								var name = dbName + " - " + dbSetProperty.Name;
+								var connectionString = connectionStringFunc();
+								var dbName = new Npgsql.NpgsqlConnectionStringBuilder(connectionString).Database;
 
-								if (!allDbSets.Any(d => d.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+								var dbSetProperties = dbContextType.GetProperties()
+									.Where(p => p.PropertyType.IsGenericType && p.PropertyType.Name.StartsWith("DbSet") && !options.IgnoreEntityTypes.Contains(p.PropertyType.GenericTypeArguments.First()))
+									.ToList();
+
+								foreach (var dbSetProperty in dbSetProperties)
 								{
-									allDbSets.Add(new DiscoveredDbSetEntityType()
+									var name = dbName + " - " + dbSetProperty.Name;
+
+									if (!allDbSets.Any(d => d.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
 									{
-										DbContextType = dbContextType,
-										DbSetType = dbSetProperty.PropertyType,
-										UnderlyingType = dbSetProperty.PropertyType.GenericTypeArguments.First(),
-										Name = name,
-										ConnectionString = connectionStringFunc
-									});
+										allDbSets.Add(new DiscoveredDbSetEntityType()
+										{
+											DbContextType = dbContextType,
+											DbSetType = dbSetProperty.PropertyType,
+											UnderlyingType = dbSetProperty.PropertyType.GenericTypeArguments.First(),
+											Name = name,
+											ConnectionString = connectionStringFunc
+										});
+									}
 								}
+							}
+							catch (Exception ex)
+							{
+								System.Diagnostics.Debug.WriteLine($"Skipping invalid connection string for DbContext '{dbContextType.Name}': {ex.Message}");
 							}
 						}
 					}
