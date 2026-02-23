@@ -446,7 +446,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 				dbSetPropertyName = stringParts[stringParts.Length - 1];
 			}
 
-			foreach (var dbSetEntity in dbSetEntities.Where(db => db.Name.ToLowerInvariant() == viewModel.DbSetName.ToLowerInvariant()))
+			foreach (var dbSetEntity in GetAllDiscoveredDbSets().Where(db => db.Name.ToLowerInvariant() == viewModel.DbSetName.ToLowerInvariant()))
 			{
 				foreach (var dbSetProperty in dbSetEntity.DbContextType.GetProperties())
 				{
