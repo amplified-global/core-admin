@@ -288,7 +288,7 @@ namespace DotNetEd.CoreAdmin.Controllers
 						{
 							var result = await options.OnTenantCreated(newEntity);
 
-							if (result.connectionString != null)
+							if (result.connectionString != null && result.dbContextTypeName != null)
 							{
 								if (options.Context2ConnectionStrings == null)
 								{
