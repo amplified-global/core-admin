@@ -9,9 +9,9 @@ jobs:
 
     runs-on: windows-2022
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
       with:
         dotnet-version: 8.0.x
     - name: Install dependencies
@@ -23,7 +23,7 @@ jobs:
          cd src\DotNetEd.CoreAdmin
          dotnet pack -c Release -o out
     - name: Setup nuget
-      uses: nuget/setup-nuget@v1
+      uses: nuget/setup-nuget@d105a947828025cd7a980103c35ba2bfae586d0f # v2.0.2
       with:
         nuget-api-key: ${{ secrets.PACKAGE_PAT }}
     - name: Push generated package to Github
